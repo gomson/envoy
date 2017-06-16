@@ -220,7 +220,11 @@ void InstanceImpl::startWorkers(TestHooks& hooks) {
   ENVOY_LOG(warn, "all dependencies initialized. starting workers");
   for (const WorkerPtr& worker : workers_) {
     try {
-      worker->initializeConfiguration(listener_manager_, *guard_dog_);
+      for (const auto& listener : listener_manager_.listeners()) {
+        worker->addListenerNonThreadSafe(listener);
+      }
+
+      worker->initialize(*guard_dog_);
     } catch (const Network::CreateListenerException& e) {
       // It is possible that we fail to start listening on a port, even though we were able to
       // bind to it above. This happens when there is a race between two applications to listen
@@ -236,6 +240,7 @@ void InstanceImpl::startWorkers(TestHooks& hooks) {
   // if applicable that they can stop listening and drain.
   restarter_.drainParentListeners();
   drain_manager_->startParentShutdownSequence();
+  listener_manager_.enterPostInitMode(*this);
   hooks.onServerInitialized();
 }
 
@@ -352,6 +357,10 @@ void InstanceImpl::shutdownAdmin() {
 
   ENVOY_LOG(warn, "terminating parent process");
   restarter_.terminateParent();
+}
+
+void InstanceImpl::onListenerStateChange(const ListenerSharedPtr&, StateChangeType) {
+  ASSERT(false); // fixfix
 }
 
 } // Server

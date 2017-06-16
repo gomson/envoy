@@ -7,6 +7,8 @@
 #include "common/common/logger.h"
 #include "common/json/json_validator.h"
 
+#include "server/init_manager_impl.h"
+
 namespace Envoy {
 namespace Server {
 
@@ -35,7 +37,6 @@ public:
   }
   Network::ListenSocketPtr createListenSocket(Network::Address::InstanceConstSharedPtr address,
                                               bool bind_to_port) override;
-
 private:
   Instance& server_;
 };
@@ -49,11 +50,17 @@ class ListenerImpl : public Listener,
                      Json::Validator,
                      Logger::Loggable<Logger::Id::config> {
 public:
-  ListenerImpl(Instance& server, ListenerComponentFactory& factory, const Json::Object& json);
+  /**
+   * fixfix
+   */
+  ListenerImpl(const Json::Object& json, Instance& server, ListenerComponentFactory& factory,
+               bool post_init_mode);
+
+  Network::Address::InstanceConstSharedPtr address() { return address_; }
+  void setSocket(Network::ListenSocketPtr&& socket);
 
   // Server::Listener
   Network::FilterChainFactory& filterChainFactory() override { return *this; }
-  Network::Address::InstanceConstSharedPtr address() override { return address_; }
   Network::ListenSocket& socket() override { return *socket_; }
   bool bindToPort() override { return bind_to_port_; }
   Ssl::ServerContext* sslContext() override { return ssl_context_.get(); }
@@ -61,6 +68,7 @@ public:
   bool useOriginalDst() override { return use_original_dst_; }
   uint32_t perConnectionBufferLimitBytes() override { return per_connection_buffer_limit_bytes_; }
   Stats::Scope& listenerScope() override { return *listener_scope_; }
+  const std::string& name() override { return name_; }
 
   // Server::Configuration::FactoryContext
   AccessLog::AccessLogManager& accessLogManager() override { return server_.accessLogManager(); }
@@ -69,7 +77,7 @@ public:
   DrainManager& drainManager() override { return server_.drainManager(); }
   bool healthCheckFailed() override { return server_.healthCheckFailed(); }
   Tracing::HttpTracer& httpTracer() override { return server_.httpTracer(); }
-  Init::Manager& initManager() override { return server_.initManager(); }
+  Init::Manager& initManager() override;
   const LocalInfo::LocalInfo& localInfo() override { return server_.localInfo(); }
   Envoy::Runtime::RandomGenerator& random() override { return server_.random(); }
   RateLimit::ClientPtr
@@ -96,24 +104,35 @@ private:
   const bool use_original_dst_{};
   const uint32_t per_connection_buffer_limit_bytes_{};
   std::list<Configuration::NetworkFilterFactoryCb> filter_factories_;
+  const std::string name_;
+  const bool post_init_mode_;
+  InitManagerImpl dynamic_init_manager_;
 };
 
 /**
  * Implementation of ListenerManager.
  */
-class ListenerManagerImpl : public ListenerManager {
+class ListenerManagerImpl : public ListenerManager, Logger::Loggable<Logger::Id::config> {
 public:
   ListenerManagerImpl(Instance& server, ListenerComponentFactory& factory)
       : server_(server), factory_(factory) {}
 
+  void enterPostInitMode(ListenerManagerCallbacks& callbacks);
+
   // Server::ListenerManager
-  void addListener(const Json::Object& json) override;
-  std::list<std::reference_wrapper<Listener>> listeners() override;
+  void addOrUpdateListener(const Json::Object& json) override;
+  std::list<ListenerSharedPtr> listeners() override { return active_listeners_; }
+  void removeListener(const std::string& listener_name) override;
 
 private:
+  std::list<ListenerSharedPtr>::iterator getListenerByName(std::list<ListenerSharedPtr>& listeners,
+                                                           const std::string& name);
+
   Instance& server_;
   ListenerComponentFactory& factory_;
-  std::list<ListenerPtr> listeners_;
+  std::list<ListenerSharedPtr> active_listeners_;
+  std::list<ListenerSharedPtr> warming_listeners_;
+  bool post_init_mode_{};
 };
 
 } // Server

@@ -19,24 +19,24 @@ Worker::Worker(ThreadLocal::Instance& tls, std::chrono::milliseconds file_flush_
   tls_.registerThread(handler_->dispatcher(), false);
 }
 
-Worker::~Worker() {}
-
-void Worker::initializeConfiguration(ListenerManager& listener_manager, GuardDog& guard_dog) {
-  for (Listener& listener : listener_manager.listeners()) {
-    const Network::ListenerOptions listener_options = {
-        .bind_to_port_ = listener.bindToPort(),
-        .use_proxy_proto_ = listener.useProxyProto(),
-        .use_original_dst_ = listener.useOriginalDst(),
-        .per_connection_buffer_limit_bytes_ = listener.perConnectionBufferLimitBytes()};
-    if (listener.sslContext()) {
-      handler_->addSslListener(listener.filterChainFactory(), *listener.sslContext(),
-                               listener.socket(), listener.listenerScope(), listener_options);
-    } else {
-      handler_->addListener(listener.filterChainFactory(), listener.socket(),
-                            listener.listenerScope(), listener_options);
-    }
+void Worker::addListenerNonThreadSafe(ListenerSharedPtr listener) {
+  const Network::ListenerOptions listener_options = {
+      .bind_to_port_ = listener->bindToPort(),
+      .use_proxy_proto_ = listener->useProxyProto(),
+      .use_original_dst_ = listener->useOriginalDst(),
+      .per_connection_buffer_limit_bytes_ = listener->perConnectionBufferLimitBytes()};
+  if (listener->sslContext()) {
+    handler_->addSslListener(listener->filterChainFactory(), *listener->sslContext(),
+                             listener->socket(), listener->listenerScope(), listener_options);
+  } else {
+    handler_->addListener(listener->filterChainFactory(), listener->socket(),
+                          listener->listenerScope(), listener_options);
   }
+}
 
+void Worker::addListenerThreadSafe(ListenerSharedPtr) {}
+
+void Worker::initialize(GuardDog& guard_dog) {
   thread_.reset(new Thread::Thread([this, &guard_dog]() -> void { threadRoutine(guard_dog); }));
 }
 

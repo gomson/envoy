@@ -119,8 +119,9 @@ public:
   MockListenerManager();
   ~MockListenerManager();
 
-  MOCK_METHOD1(addListener, void(const Json::Object& json));
-  MOCK_METHOD0(listeners, std::list<std::reference_wrapper<Listener>>());
+  MOCK_METHOD1(addOrUpdateListener, void(const Json::Object& json));
+  MOCK_METHOD0(listeners, std::list<ListenerSharedPtr>());
+  MOCK_METHOD1(removeListener, void(const std::string& listener_name));
 };
 
 class MockInstance : public Instance {

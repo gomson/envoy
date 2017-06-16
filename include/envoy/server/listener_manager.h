@@ -50,14 +50,8 @@ public:
   virtual Network::FilterChainFactory& filterChainFactory() PURE;
 
   /**
-   * @return Network::Address::InstanceConstSharedPtr the configured address for the listener. This
-   *         may be distinct to the bound address, e.g. if the port is zero.
-   */
-  virtual Network::Address::InstanceConstSharedPtr address() PURE;
-
-  /**
    * @return Network::ListenSocket& the actual listen socket. The address of this socket may be
-   *         different from address() if for example the configured address binds to port zero.
+   *         different from configured if for example the configured address binds to port zero.
    */
   virtual Network::ListenSocket& socket() PURE;
 
@@ -95,9 +89,32 @@ public:
    * @return Stats::Scope& the stats scope to use for all listener specific stats.
    */
   virtual Stats::Scope& listenerScope() PURE;
+
+  /**
+   * fixfix
+   */
+  virtual const std::string& name() PURE;
 };
 
-typedef std::unique_ptr<Listener> ListenerPtr;
+typedef std::shared_ptr<Listener> ListenerSharedPtr;
+
+/**
+ * fixfix
+ */
+class ListenerManagerCallbacks {
+public:
+  enum class StateChangeType {
+    Added,  // fixfix
+    Removed // fixfix
+  };
+
+  virtual ~ListenerManagerCallbacks() {}
+
+  /**
+   *
+   */
+  virtual void onListenerStateChange(const ListenerSharedPtr& listener, StateChangeType type) PURE;
+};
 
 /**
  * A manager for all listeners.
@@ -107,16 +124,22 @@ public:
   virtual ~ListenerManager() {}
 
   /**
-   * Add a listener to the manager.
+   * Add a listener to the manager. fixfix
    * @param json supplies the configuration JSON. Will throw an EnvoyException if the listener can
    *        not be added.
    */
-  virtual void addListener(const Json::Object& json) PURE;
+  virtual void addOrUpdateListener(const Json::Object& json) PURE;
 
   /**
-   * @return std::list<std::reference_wrapper<Listener>> a list of the currently loaded listeners.
+   * @return std::list<ListenerSharedPtr> a list of the currently loaded listeners.
+   * fixfix comment about return type.
    */
-  virtual std::list<std::reference_wrapper<Listener>> listeners() PURE;
+  virtual std::list<ListenerSharedPtr> listeners() PURE;
+
+  /**
+   * fixfix
+   */
+  virtual void removeListener(const std::string& listener_name) PURE;
 };
 
 } // Server

@@ -83,7 +83,9 @@ public:
 /**
  * This is the actual full standalone server which stiches together various common components.
  */
-class InstanceImpl : Logger::Loggable<Logger::Id::main>, public Instance {
+class InstanceImpl : Logger::Loggable<Logger::Id::main>,
+                     public Instance,
+                     public ListenerManagerCallbacks {
 public:
   InstanceImpl(Options& options, TestHooks& hooks, HotRestart& restarter, Stats::StoreRoot& store,
                Thread::BasicLockable& access_log_lock, ComponentFactory& component_factory,
@@ -125,6 +127,9 @@ public:
   Tracing::HttpTracer& httpTracer() override;
   ThreadLocal::Instance& threadLocal() override { return thread_local_; }
   const LocalInfo::LocalInfo& localInfo() override { return local_info_; }
+
+  // Server::ListenerManagerCallbacks
+  void onListenerStateChange(const ListenerSharedPtr& listener, StateChangeType type) override;
 
 private:
   void flushStats();
